@@ -81,8 +81,8 @@ unsigned long OldTime = StartTime;
 
 float old_angle = 0;
 
-const int SERVO_LEFT = D1;
-const int SERVO_RIGHT = D2;
+const int SERVO_LEFT = D2;
+const int SERVO_RIGHT = D1;
 Servo servo_left;
 Servo servo_right;
 int servo_left_ctr = 90;
@@ -186,7 +186,6 @@ void setup() {
 }
 
 void loop() {
-    // sensor_loop();
     wsLoop();
     httpLoop();
     actionLoop();
@@ -195,7 +194,7 @@ void loop() {
 float time_interval = 0.082;
 void actionLoop()
 {
-  left();
+  forward();
   struct Sensors s = measureSensors();
   float x = s.len_x;
   float y = s.len_y;
