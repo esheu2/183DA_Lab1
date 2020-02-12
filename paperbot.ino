@@ -129,7 +129,6 @@ void I2Cread(uint8_t Address, uint8_t Register, uint8_t Nbytes, uint8_t* Data)
     Data[index++]=Wire.read();
 }
 
-
 // Write a byte (Data) in device (Address) at register (Register)
 void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
 {
@@ -140,6 +139,103 @@ void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
   Wire.endTransmission();
 }
 /* END FUNCTIONS FROM SENSOR TEST */
+
+  
+
+/* STUFF FROM C++ CODE */
+
+    int x = 2; //original x-coordinate
+    int y = 2; //original y-coordinate
+    float theta = 90; //original rotation angle
+    double state[] = {0, 0, 0, 0};
+  
+    //new positions
+    int new_x = 0; //x'
+    int new_y = 0; //y'
+    float new_theta; //theta'
+    
+    //constants
+    double h = 2; //distance travelled by robot in one f/b pulse
+    double phi = 5; //angle rotated by robot in one l/r pulse
+    double t_interval = 0.08; //time interval in seconds used to calculate rotational speed
+    double L = 1000; //known distance between origin and right wall
+    double W = 1000; //known distance between origin and front wall
+    
+    //new constants
+    double v_r = 2; //translational right velocity
+    double v_l = 2; //translational left velocity
+    double v = 0; //translational velocity
+    double delta_theta = 0; //change in rotational velocity
+    double d = 25.4; //half of the width of the car
+    double R;
+    float delta_x;
+    float delta_y;
+    double d1, d2, d3, d4;
+    double l1, l2, l3, l4;
+    
+    // bool running = true;
+    // string input = "";
+
+/* END OF STUFF FROM C++ CODE */
+
+void calculations() {
+        /*      SENSOR MEASUREMENT MODELS      */
+        int d_f = W - new_y; //calculate new distance b/w robot and front wall
+        int d_r = L - new_x; //calculate new distance b/w robot and right wall
+        int rot_sp = (new_theta - theta) / t_interval; //calculate rotational speed
+        
+        
+        // calculations
+        
+        // mathematical model
+        v = (v_r + v_l) / 2;
+        R = (2*d*v_r) / (v_l - v_r);
+        delta_x = v * cos(new_theta * M_PI / 180.0);
+        delta_y = v * sin(new_theta * M_PI / 180.0);
+        new_x = x + delta_x;
+        new_y = y + delta_y;
+        
+        // measurement model
+        d1 = abs((L - new_x)/cos(new_theta * M_PI / 180.0));
+        d2 = abs((W - new_y)/sin(new_theta * M_PI / 180.0));
+        d3 = abs((new_x)/cos((new_theta+180.0)* M_PI / 180.0));
+        d4 = abs((new_y)/sin((new_theta+180.0)* M_PI / 180.0));
+        
+        l1 = abs((L-new_x)/sin(new_theta * M_PI / 180.0));
+        l2 = abs((W-new_y)/cos((new_theta+180.0)* M_PI / 180.0));
+        l3 = abs((new_x)/sin((new_theta+180.0)* M_PI / 180.0));
+        l4 = abs((new_y)/cos(new_theta* M_PI / 180.0));
+        
+        state[0] = new_x;
+        state[1] = new_y;
+        state[2] = new_theta;
+        state[3] = rot_sp;
+
+        // cout << "new_theta = " << new_theta << endl;
+        // cout << "delta x = " << delta_x << endl;
+        Serial.println ("Current position: (");
+        Serial.print(new_x);
+        Serial.print(", ");
+        Serial.print(new_y);
+        Serial.print(")");
+        // cout << "), Current rotation angle: " << new_theta << endl;
+        // cout << "New front wall distance: " << d_f;
+        // cout << ", New right wall distance: " << d_r;
+        // cout << ", Rotational speed: " << rot_sp;
+        // cout << ", Translational velocity: " << v;
+        // cout << ", Distance R: " << R << endl;
+        // cout << "d1 = " << d1 << ", d2 = " << d2 << ", d3 = " << d3 << ", d4 = " << d4 << endl;
+        // cout << "l1 = " << l1 << ", l2 = " << l2 << ", l3 = " << l3 << ", l4 = " << l4 << endl;
+        // cout << "state: " << state[0] << " " << state[1] << " " << state[2] << " " << state[3] << endl;
+        // cout << endl;
+        
+        //update positions
+        x = new_x;
+        y = new_y;
+        theta = new_theta;
+    }
+
+
 
 void setup() {
     setupPins();
@@ -192,6 +288,7 @@ void loop() {
 }
 
 float time_interval = 0.082;
+
 void actionLoop()
 {
   forward();
@@ -336,9 +433,19 @@ struct Sensors measureSensors()
   float headingDegrees = heading * 180/PI; 
 
   struct Sensors s;
-  s.len_x = sensor2.readRangeSingleMillimeters();
-  s.len_y = sensor1.readRangeSingleMillimeters();
+  s.len_x = sensor2.readRangeSingleMillimeters(); // front
+  s.len_y = sensor1.readRangeSingleMillimeters(); // right
   s.theta = heading;
+
+
+  /* Current Position Calculation */
+  int d_f_sensor = 1000 - s.len_y; //calculate new distance b/w robot and front wall with sensor readings
+  int d_r_sensor = 1000 - s.len_x; //calculate new distance b/w robot and right wall with sensor readings
+  // First numbers (e.g. 1000) can be changed based upon bounds of the box
+  Serial.println("X position:");
+  Serial.print(d_f_sensor);
+  Serial.print(", Y position:");
+  Serial.print(d_r_sensor);
 
   Serial.print("\rHeading:\t");
   Serial.print(heading);
@@ -411,21 +518,54 @@ void stop() {
 void forward() {
   DEBUG("forward");
   drive(0, 180);
+  new_theta = theta;
+            
+  //new
+  v_r = 2;
+  v_l = 2;
+  delta_theta = 0;
+
+  calculations();
 }
 
 void backward() {
   DEBUG("backward");
   drive(180, 0);
+
+  new_theta = theta;
+            
+  //new
+  v_r = -2;
+  v_l = -2;
+  delta_theta = 0;
+
+  calculations();
 }
 
 void left() {
   DEBUG("left");
   drive(180, 180);
+
+  //new
+  v_r = 2;
+  v_l = -2;
+  delta_theta = 4 / 2*d;
+  new_theta = theta + delta_theta;
+
+  calculations();
 }
 
 void right() {
   DEBUG("right");
   drive(0, 0);
+
+  //new
+  v_r = -2;
+  v_l = 2;
+  delta_theta = -4 / 2*d;
+  new_theta = theta + delta_theta;
+
+  calculations();
 }
 
 
@@ -515,4 +655,6 @@ void webSocketEvent(uint8_t id, WStype_t type, uint8_t * payload, size_t length)
 
             break;
     }
+
+    
 }
