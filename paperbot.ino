@@ -279,9 +279,6 @@ void calculations() {
         int d_r = L - new_x; //calculate new distance b/w robot and right wall
         int rot_sp = (new_theta - theta) / t_interval; //calculate rotational speed
         
-        
-        // calculations
-        
         // mathematical model
         v = (v_r + v_l) / 2;
         R = (2*d*v_r) / (v_l - v_r);
@@ -380,12 +377,12 @@ void loop() {
     wsLoop(); // Helps to set up the wireless server for the Arduino of the paperbot.
     httpLoop(); // Allows us to wirelessly transmit data between the PC and the Arduino.
     actionLoop(); // Allows us to assign inputs to the Arduino and access the parameters delivered by the sensors.
-    gaussian_calcs_right(); // Determines the noise model and variances for the right sensor.
-    //gaussian_calcs_front(); // Determines the noise model and variances for the front sensor. Currently does not compile with other gaussian calculations; most likely due to memory issues associated with arrays in each function.
-    //gaussian_calcs_theta(); // Currently does not compile with other gaussian calculations; most likely due to memory issues associated with arrays in each function.
+    gaussian_calcs_right(); // Determines the noise model, mean, variances and state-estimated x position for the right sensor.
+    //gaussian_calcs_front(); // Determines the noise model, mean, variances and state-estimated y position for the front sensor. Currently does not compile with other gaussian calculations; most likely due to memory issues associated with arrays in each function.
+    //gaussian_calcs_theta(); // Determines the noise model, mean, variances and state-estimated theta position for theta. Currently does not compile with other gaussian calculations; most likely due to memory issues associated with arrays in each function.
 }
 
-float time_interval = 0.082; // Time interval between measurements for our Arduino.
+float time_interval = 0.08; // Time interval between measurements for our Arduino.
 
 void actionLoop()
 {
@@ -393,29 +390,29 @@ void actionLoop()
   unsigned long time2 = millis();
   while (time2-time1 < 5000) // Move forward for 5 seconds.
   {
-    forward();
     time2 = millis();
+    forward();
   }
   time1 = millis();
   time2 = millis();
   while (time2-time1 < 5000) // Move backward for 5 seconds.
   {
-    backward();
     time2 = millis();
+    backward();
   }
   time1 = millis();
   time2 = millis();
   while (time2-time1 < 5000) // Move left for 5 seconds.
   {
-    left();
     time2 = millis();
+    left();
   }
   time1 = millis();
   time2 = millis();
   while (time2-time1 < 5000) // Move right for 5 seconds.
   {
-    right();
     time2 = millis();
+    right();
   }
   struct Sensors s = measureSensors();
   float x = s.len_x;
@@ -432,14 +429,16 @@ void actionLoop()
   Serial.print ("\t y:");
   Serial.print (y);  
   Serial.println ("\t");
-  /*Serial.print ("\t Current Time:");
+  /*
+  Serial.print ("\t Current Time:");
   Serial.print (CurrentTime);  
   Serial.println ("\t");
   Serial.print ("\t Old Time:");
   Serial.print (OldTime);  
   Serial.println ("\t");
   Serial.print ("\t Period Time:");
-  Serial.print (PeriodTime);  */
+  Serial.print (PeriodTime);
+  */
   Serial.println ("\t");
 
   //OldTime = CurrentTime;
@@ -568,8 +567,8 @@ struct Sensors measureSensors()
   /* Current Position Calculation */
   int d_f_sensor = 1000 - s.len_y; //calculate new distance b/w robot and front wall with sensor readings
   int d_r_sensor = 1000 - s.len_x; //calculate new distance b/w robot and right wall with sensor readings
-  saved_sensor_right = d_r_sensor;
-  saved_sensor_front = d_f_sensor;
+  saved_sensor_right = d_r_sensor; // Stores right sensor-determined position into global variable.
+  saved_sensor_front = d_f_sensor; // Stores front sensor-determined position into global variable.
   // First numbers (e.g. 1000) can be changed based upon bounds of the box
   Serial.println("X position:");
   Serial.print(d_f_sensor);
@@ -597,7 +596,6 @@ struct Sensors measureSensors()
     first_record = false;
     old_angle = mx;
   }
-
 
   else
   {
@@ -650,11 +648,11 @@ void forward() {
   new_theta = theta;
             
   //new
-  v_r = 2;
-  v_l = 2;
+  v_r = 2; // Simulated (data-driven) right wheel rotational velocity
+  v_l = 2; // Simulated (data-driven) left wheel rotational velocity
   delta_theta = 0;
 
-  calculations();
+  calculations(); // Calls calculations to determine mathematical model and measurement model
 }
 
 void backward() {
@@ -664,11 +662,11 @@ void backward() {
   new_theta = theta;
             
   //new
-  v_r = -2;
-  v_l = -2;
+  v_r = -2; // Simulated (data-driven) right wheel rotational velocity
+  v_l = -2; // Simulated (data-driven) left wheel rotational velocity
   delta_theta = 0;
 
-  calculations();
+  calculations(); // Calls calculations to determine mathematical model and measurement model
 }
 
 void left() {
@@ -676,12 +674,12 @@ void left() {
   drive(180, 180);
 
   //new
-  v_r = 2;
-  v_l = -2;
+  v_r = 2; // Simulated (data-driven) right wheel rotational velocity
+  v_l = -2; // Simulated (data-driven) left wheel rotational velocity
   delta_theta = 4 / 2*d;
   new_theta = theta + delta_theta;
 
-  calculations();
+  calculations(); // Calls calculations to determine mathematical model and measurement model
 }
 
 void right() {
@@ -689,12 +687,12 @@ void right() {
   drive(0, 0);
 
   //new
-  v_r = -2;
-  v_l = 2;
+  v_r = -2; // Simulated (data-driven) right wheel rotational velocity
+  v_l = 2; // Simulated (data-driven) left wheel rotational velocity
   delta_theta = -4 / 2*d;
   new_theta = theta + delta_theta;
 
-  calculations();
+  calculations(); // Calls calculations to determine mathematical model and measurement model
 }
 
 
