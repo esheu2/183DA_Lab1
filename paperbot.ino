@@ -195,6 +195,7 @@ void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
     // bool running = true;
     // string input = "";
 
+// This function will determine means and variances for the right sensor distance, as well as a state-estimated x position.
 void gaussian_calcs_right() {
   float z = saved_sensor_right;
   right_values_array[running_count_right] = z;
@@ -220,6 +221,7 @@ void gaussian_calcs_right() {
   Serial.print(s_e_right);
 }
 
+// This function will determine means and variances for the front sensor distance, as well as a state-estimated y position.
 void gaussian_calcs_front() {
   float z_f = saved_sensor_front;
   front_values_array[running_count_front] = z_f;
@@ -245,6 +247,7 @@ void gaussian_calcs_front() {
   Serial.print(s_e_front);
 }
 
+// This function will determine means and variances for theta, as well as a state-estimated theta position.
 void gaussian_calcs_theta() {
   float z_t = saved_sensor_theta;
   theta_values_array[running_count_theta] = z_t;
