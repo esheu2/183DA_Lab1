@@ -43,6 +43,7 @@
 #include <ESP8266mDNS.h>
 
 #include <Servo.h>
+//#include <vector.h>
 
 #include <VL53L0X.h>
 #define SDA_port 14
@@ -140,10 +141,6 @@ void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
 }
 /* END FUNCTIONS FROM SENSOR TEST */
 
-  
-
-/* STUFF FROM C++ CODE */
-
     int x = 2; //original x-coordinate
     int y = 2; //original y-coordinate
     float theta = 90; //original rotation angle
@@ -173,10 +170,105 @@ void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
     double d1, d2, d3, d4;
     double l1, l2, l3, l4;
     
+    // Variables initiated to calculate Gaussian noise metrics
+    float noise_value_right = 0;
+    float right_mean = 0;
+    float error_sum_total_right = 0;
+    int running_count_right = 0;
+    float saved_sensor_right;
+    float right_values_array[10000];
+
+    float noise_value_front = 0;
+    float front_mean = 0;
+    float error_sum_total_front = 0;
+    int running_count_front = 0;
+    float saved_sensor_front;
+    float front_values_array[10000];
+
+    float noise_value_theta = 0;
+    float theta_mean = 0;
+    float error_sum_total_theta = 0;
+    int running_count_theta = 0;
+    float saved_sensor_theta;
+    float theta_values_array[10000];
+    
     // bool running = true;
     // string input = "";
 
-/* END OF STUFF FROM C++ CODE */
+void gaussian_calcs_right() {
+  float z = saved_sensor_right;
+  right_values_array[running_count_right] = z;
+  error_sum_total_right = z - x;
+  running_count_right++;
+  right_mean = error_sum_total_right / running_count_right; // Mean of the right sensor determined by taking cumulative error derived by a running count of instances.
+
+  float temp;
+  float sigma = 0;
+  for (int i = 0; i < running_count_right; i++)
+  {
+    temp = right_values_array[i] - right_mean;
+    temp = temp*temp;
+    sigma += temp;
+  }
+  sigma = sigma / running_count_right;
+  sigma = sqrt(sigma); // Final step for determining variance of right sensor at current time.
+
+  noise_value_right = exp(-0.5*pow((z-right_mean)/sigma,2.)); // Function for creating Gaussian distribution curve.
+
+  int s_e_right = x + noise_value_right; //calculate new distance b/w robot and right wall with sensor readings & noise modeling
+  Serial.println("State-Estimated X position:");
+  Serial.print(s_e_right);
+}
+
+void gaussian_calcs_front() {
+  float z_f = saved_sensor_front;
+  front_values_array[running_count_front] = z_f;
+  error_sum_total_front = z_f - y;
+  running_count_front++;
+  front_mean = error_sum_total_front / running_count_front; // Mean of the front sensor determined by taking cumulative error derived by a running count of instances.
+
+  float temp_f;
+  float sigma_f = 0;
+  for (int q = 0; q < running_count_front; q++)
+  {
+    temp_f = front_values_array[q] - front_mean;
+    temp_f = temp_f*temp_f;
+    sigma_f += temp_f;
+  }
+  sigma_f = sigma_f / running_count_front;
+  sigma_f = sqrt(sigma_f); // Final step for determining variance of front sensor at current time.
+
+  noise_value_front = exp(-0.5*pow((z_f-front_mean)/sigma_f,2.)); // Function for creating Gaussian distribution curve.
+
+  int s_e_front = y + noise_value_front; //calculate new distance b/w robot and front wall with sensor readings & noise modeling
+  Serial.print(", State-Estimated Y position:");
+  Serial.print(s_e_front);
+}
+
+void gaussian_calcs_theta() {
+  float z_t = saved_sensor_theta;
+  theta_values_array[running_count_theta] = z_t;
+  error_sum_total_theta = z_t - theta;
+  running_count_theta++;
+  theta_mean = error_sum_total_theta / running_count_theta; // Mean of the theta measurement determined by taking cumulative error derived by a running count of instances.
+
+  float temp_t;
+  float sigma_t = 0;
+  for (int c = 0; c < running_count_theta; c++)
+  {
+    temp_t = theta_values_array[c] - theta_mean;
+    temp_t = temp_t*temp_t;
+    sigma_t += temp_t;
+  }
+  sigma_t = sigma_t / running_count_theta;
+  sigma_t = sqrt(sigma_t); // Final step for determining variance of front sensor at current time.
+
+  noise_value_theta = exp(-0.5*pow((z_t-theta_mean)/sigma_t,2.)); // Function for creating Gaussian distribution curve.
+
+  int s_e_theta = theta + noise_value_theta; //calculate new theta with sensor readings & noise modeling
+  Serial.println("State-Estimated Theta position:");
+  Serial.print(s_e_theta);
+}
 
 void calculations() {
         /*      SENSOR MEASUREMENT MODELS      */
@@ -282,16 +374,46 @@ void setup() {
 }
 
 void loop() {
-    wsLoop();
-    httpLoop();
-    actionLoop();
+    wsLoop(); // Helps to set up the wireless server for the Arduino of the paperbot.
+    httpLoop(); // Allows us to wirelessly transmit data between the PC and the Arduino.
+    actionLoop(); // Allows us to assign inputs to the Arduino and access the parameters delivered by the sensors.
+    gaussian_calcs_right(); // Determines the noise model and variances for the right sensor.
+    //gaussian_calcs_front(); // Determines the noise model and variances for the front sensor. Currently does not compile with other gaussian calculations; most likely due to memory issues associated with arrays in each function.
+    //gaussian_calcs_theta(); // Currently does not compile with other gaussian calculations; most likely due to memory issues associated with arrays in each function.
 }
 
-float time_interval = 0.082;
+float time_interval = 0.082; // Time interval between measurements for our Arduino.
 
 void actionLoop()
 {
-  forward();
+  unsigned long time1 = millis();
+  unsigned long time2 = millis();
+  while (time2-time1 < 5000) // Move forward for 5 seconds.
+  {
+    forward();
+    time2 = millis();
+  }
+  time1 = millis();
+  time2 = millis();
+  while (time2-time1 < 5000) // Move backward for 5 seconds.
+  {
+    backward();
+    time2 = millis();
+  }
+  time1 = millis();
+  time2 = millis();
+  while (time2-time1 < 5000) // Move left for 5 seconds.
+  {
+    left();
+    time2 = millis();
+  }
+  time1 = millis();
+  time2 = millis();
+  while (time2-time1 < 5000) // Move right for 5 seconds.
+  {
+    right();
+    time2 = millis();
+  }
   struct Sensors s = measureSensors();
   float x = s.len_x;
   float y = s.len_y;
@@ -374,6 +496,8 @@ void sensorsSetup() {
 //timing tests
 bool first_record = true;
 long int cpt=0;
+
+
 // Main loop, read and display data
 struct Sensors measureSensors()
 {
@@ -441,6 +565,8 @@ struct Sensors measureSensors()
   /* Current Position Calculation */
   int d_f_sensor = 1000 - s.len_y; //calculate new distance b/w robot and front wall with sensor readings
   int d_r_sensor = 1000 - s.len_x; //calculate new distance b/w robot and right wall with sensor readings
+  saved_sensor_right = d_r_sensor;
+  saved_sensor_front = d_f_sensor;
   // First numbers (e.g. 1000) can be changed based upon bounds of the box
   Serial.println("X position:");
   Serial.print(d_f_sensor);
@@ -492,7 +618,7 @@ struct Sensors measureSensors()
 
     old_angle = mx;
   }
-  
+  saved_sensor_theta = mx;
   
   // End of line
   return s; 
